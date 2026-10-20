@@ -35,7 +35,7 @@ The app's interface is in Spanish.
 
 Highest score comes first; ties keep the original player order.
 
-> The host's editing access stays in the browser where the game was created. Clearing browser data or switching devices loses that access. Anyone with the shared link can see player names and scores.
+> The host's editing access stays in the browser where the game was created. Clearing browser data or switching devices loses that access. Shared links and codes open in view-only mode, including when opened in the host's browser. To edit, the host returns to the original game address without `?view=1`. Anyone with the shared link can see player names and scores.
 
 ## 📱 Use on iPhone
 

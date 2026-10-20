@@ -43,7 +43,13 @@ import {
   RequestError,
 } from "@/lib/client";
 
-export function GameScreen({ code }: { code: string }) {
+export function GameScreen({
+  code,
+  viewOnly,
+}: {
+  code: string;
+  viewOnly: boolean;
+}) {
   const [game, setGame] = useState<Game | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -73,16 +79,23 @@ export function GameScreen({ code }: { code: string }) {
   const hasGame = game !== null;
   const hasDraft = draft !== null;
   const draftStep = draft?.step;
+  const hostCanEdit = canEdit && !viewOnly;
 
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
     async function load() {
       try {
-        try {
-          token.current = localStorage.getItem(hostKey(code));
-        } catch {
+        if (viewOnly) {
           token.current = null;
+          setCanEdit(false);
+          setDraft(null);
+        } else {
+          try {
+            token.current = localStorage.getItem(hostKey(code));
+          } catch {
+            token.current = null;
+          }
         }
         const data = await readGame(code, token.current, controller.signal);
         if (!active) return;
@@ -94,8 +107,8 @@ export function GameScreen({ code }: { code: string }) {
         setGame(data.game);
         setCanEdit(data.canEdit);
         setInitialError("");
-        setShareUrl(`${location.origin}/p/${code}`);
-        if (data.canEdit) {
+        setShareUrl(`${location.origin}/p/${code}?view=1`);
+        if (!viewOnly && data.canEdit) {
           try {
             const stored = JSON.parse(
               localStorage.getItem(draftKey(code)) ?? "null",
@@ -116,7 +129,7 @@ export function GameScreen({ code }: { code: string }) {
       active = false;
       controller.abort();
     };
-  }, [code, retry]);
+  }, [code, retry, viewOnly]);
 
   const refresh = useCallback(async () => {
     if (
@@ -203,7 +216,7 @@ export function GameScreen({ code }: { code: string }) {
   }
 
   function startRound() {
-    if (!game || !canEdit) return;
+    if (!game || !hostCanEdit) return;
     setNotice("");
     setPointFeedback(null);
     setConflict(false);
@@ -258,7 +271,7 @@ export function GameScreen({ code }: { code: string }) {
     if (
       !draft ||
       !game ||
-      !canEdit ||
+      !hostCanEdit ||
       savingLock.current ||
       draft.points.some((p) => p === null)
     )
@@ -411,7 +424,7 @@ export function GameScreen({ code }: { code: string }) {
     <div className="game-app">
       <header className="app-header">
         <Brand href={null} />
-        {draft && canEdit ? (
+        {draft && hostCanEdit ? (
           <span className="role-pill">Cargando ronda</span>
         ) : (
           <div className="app-header-actions">
@@ -436,7 +449,9 @@ export function GameScreen({ code }: { code: string }) {
         )}
       </header>
       <main
-        className={`play-main ${draft && canEdit ? "is-loading-round" : "is-scoreboard"}`}
+        className={`play-main ${
+          draft && hostCanEdit ? "is-loading-round" : "is-scoreboard"
+        }`}
       >
         {connectionError && (
           <div className="play-connection" role="status">
@@ -447,7 +462,7 @@ export function GameScreen({ code }: { code: string }) {
             </button>
           </div>
         )}
-        {canEdit && draft ? (
+        {hostCanEdit && draft ? (
           <section
             className={`card round-panel ${completed ? "round-summary" : "round-entry"}`}
             aria-label="Carga de ronda"
@@ -625,7 +640,7 @@ export function GameScreen({ code }: { code: string }) {
               </p>
             )}
             <div className="play-bottom">
-              {canEdit ? (
+              {hostCanEdit ? (
                 <button className="button primary full" onClick={startRound}>
                   <Plus size={21} /> Cargar ronda {game.roundCount + 1}
                 </button>
@@ -636,7 +651,7 @@ export function GameScreen({ code }: { code: string }) {
                 </span>
               )}
               <p className="hint">
-                {canEdit
+                {hostCanEdit
                   ? "Vos anotás. Puntito suma."
                   : "Estás viendo la partida"}
               </p>
