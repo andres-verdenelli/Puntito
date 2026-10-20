@@ -920,6 +920,10 @@ svg {
   border-radius: 13px;
   min-height: 91px;
   color: var(--ink);
+  transition: transform 90ms ease-out;
+}
+.score-button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .score-button strong {
   font-size: 31px;
@@ -1802,6 +1806,93 @@ body:has(.app-frame) {
 .play-main .progress-track {
   margin: 16px 0 20px;
   flex-shrink: 0;
+}
+.score-popover {
+  position: fixed;
+  z-index: 20;
+  width: 160px;
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: #fcf9eb;
+  background: var(--teal);
+  border: 1px solid #ffffff30;
+  border-radius: 18px;
+  box-shadow: 0 6px 18px #203b3630;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: bottom center;
+  animation: score-popover 900ms ease-out both;
+}
+.score-popover::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: calc(50% - 6px);
+  width: 12px;
+  height: 12px;
+  background: var(--teal);
+  transform: rotate(45deg);
+  border-bottom-right-radius: 3px;
+}
+.score-popover strong {
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.score-popover-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.score-popover-spark {
+  position: absolute;
+  right: -6px;
+  top: -9px;
+  color: var(--coral);
+  font-size: 24px;
+  line-height: 1;
+  text-shadow: 0 1px 0 var(--paper);
+}
+@keyframes score-popover {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 22px)) scale(0.75) rotate(-7deg);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 36px)) scale(1.06) rotate(2deg);
+  }
+  32% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 42px)) scale(1) rotate(0deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 58px)) scale(1) rotate(-1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 80px)) scale(0.96) rotate(-3deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .score-button {
+    transition: none;
+  }
+  .score-button:active:not(:disabled) {
+    transform: none;
+  }
+  .score-popover {
+    animation: none;
+    transform: translate(-50%, calc(-100% - 32px));
+  }
 }
 .play-main .round-question {
   margin-top: auto;

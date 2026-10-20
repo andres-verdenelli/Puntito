@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -49,6 +55,13 @@ export function GameScreen({ code }: { code: string }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [notice, setNotice] = useState("");
+  const [pointFeedback, setPointFeedback] = useState<{
+    id: number;
+    name: string;
+    points: Points;
+    x: number;
+    y: number;
+  } | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [retry, setRetry] = useState(0);
   const token = useRef<string | null>(null);
@@ -154,6 +167,12 @@ export function GameScreen({ code }: { code: string }) {
   }, [notice]);
 
   useEffect(() => {
+    if (!pointFeedback) return;
+    const id = window.setTimeout(() => setPointFeedback(null), 900);
+    return () => window.clearTimeout(id);
+  }, [pointFeedback]);
+
+  useEffect(() => {
     if (!hasDraft) return;
     stepLock.current = false;
     heading.current?.focus({ preventScroll: true });
@@ -186,6 +205,7 @@ export function GameScreen({ code }: { code: string }) {
   function startRound() {
     if (!game || !canEdit) return;
     setNotice("");
+    setPointFeedback(null);
     setConflict(false);
     persist({
       id: randomId(),
@@ -195,9 +215,12 @@ export function GameScreen({ code }: { code: string }) {
     });
   }
 
-  function choose(points: Points, timestamp: number) {
+  function choose(points: Points, event: MouseEvent<HTMLButtonElement>) {
+    const timestamp = event.timeStamp;
     if (
       !draft ||
+      !game ||
+      draft.step >= game.players.length ||
       savingLock.current ||
       stepLock.current ||
       (lastChoice.current !== null && timestamp - lastChoice.current < 300)
@@ -205,14 +228,29 @@ export function GameScreen({ code }: { code: string }) {
       return;
     stepLock.current = true;
     lastChoice.current = timestamp;
+    const button = event.currentTarget.getBoundingClientRect();
+    const x =
+      event.detail === 0 ? button.left + button.width / 2 : event.clientX;
+    const y =
+      event.detail === 0 ? button.top + button.height / 2 : event.clientY;
     const updated = [...draft.points];
     updated[draft.step] = points;
-    if (!persist({ ...draft, points: updated, step: draft.step + 1 }))
+    if (persist({ ...draft, points: updated, step: draft.step + 1 })) {
+      setPointFeedback({
+        id: timestamp,
+        name: game.players[draft.step].name,
+        points,
+        x: Math.max(92, Math.min(window.innerWidth - 92, x)),
+        y: Math.max(176, y),
+      });
+    } else {
       stepLock.current = false;
+    }
   }
 
   function back() {
     if (!draft || !draft.step || savingLock.current) return;
+    setPointFeedback(null);
     persist({ ...draft, step: draft.step - 1 });
   }
 
@@ -226,6 +264,7 @@ export function GameScreen({ code }: { code: string }) {
     )
       return;
     savingLock.current = true;
+    setPointFeedback(null);
     setSaving(true);
     setError("");
     setConflict(false);
@@ -445,7 +484,7 @@ export function GameScreen({ code }: { code: string }) {
                     <button
                       className={`score-button ${draft.points[draft.step] === p ? "selected" : ""}`}
                       key={p}
-                      onClick={(event) => choose(p, event.timeStamp)}
+                      onClick={(event) => choose(p, event)}
                       disabled={saving}
                       aria-pressed={draft.points[draft.step] === p}
                       aria-label={`${p} puntos para ${current.name}`}
@@ -605,6 +644,22 @@ export function GameScreen({ code }: { code: string }) {
           </>
         )}
       </main>
+      <div className="sr-only" role="status" aria-atomic="true">
+        {pointFeedback &&
+          `${pointFeedback.name}: ${pointFeedback.points} puntos anotados.`}
+      </div>
+      {pointFeedback && (
+        <div
+          className="score-popover"
+          key={pointFeedback.id}
+          style={{ left: pointFeedback.x, top: pointFeedback.y }}
+          aria-hidden="true"
+        >
+          <span className="score-popover-spark">✦</span>
+          <strong>+{pointFeedback.points}</strong>
+          <span className="score-popover-name">{pointFeedback.name}</span>
+        </div>
+      )}
       {notice && (
         <div className="play-toast" role="status">
           {notice}
