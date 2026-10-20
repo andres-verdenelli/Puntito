@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+.env*
+output
+.playwright-cli
+.vercel
+supabase/.temp
+supabase/.branches

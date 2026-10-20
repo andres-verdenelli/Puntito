@@ -2,6 +2,8 @@
 
 Una app para llevar los puntos de la mesa: una persona anota, el resto mira el marcador desde su celular. Sin registro ni contraseñas.
 
+**Aplicación:** [puntito-nine.vercel.app](https://puntito-nine.vercel.app) · [Proyecto Supabase](https://supabase.com/dashboard/project/tafjfzsqqiqmgjvztkck) · [Repositorio](https://github.com/andres-verdenelli/Puntito).
+
 ## Cómo se usa
 
 1. Creá una partida y agregá entre 2 y 20 nombres. Podés acomodarlos antes de empezar: ese orden se usa para cargar los puntos, aunque después cambien las posiciones.
@@ -38,8 +40,29 @@ Las pruebas ejecutan SQL real en PGlite: creación, rondas atómicas, idempotenc
 
 ## Supabase Free
 
-1. Creá un proyecto **Free** en [Supabase](https://supabase.com/dashboard). Elegí una región cercana a tu despliegue de Vercel. No hace falta activar Auth ni Realtime.
-2. Ejecutá el contenido de [la migración inicial](supabase/migrations/202610200001_initial.sql) una sola vez desde SQL Editor.
+El proyecto remoto **Puntito** usa la región `sa-east-1` (São Paulo). Las funciones de Vercel usan `gru1`, fijado en `vercel.json`. No hace falta activar Auth ni Realtime.
+
+Las CLI de Supabase y Vercel están en `devDependencies`, con versiones exactas. Para autenticarte desde este repositorio:
+
+```sh
+pnpm exec supabase login
+pnpm exec vercel login
+```
+
+Para vincular la base existente y aplicar futuras migraciones:
+
+```sh
+pnpm exec supabase link --project-ref tafjfzsqqiqmgjvztkck
+pnpm exec supabase db push --dry-run
+pnpm exec supabase db push
+```
+
+La configuración del proyecto queda en `supabase/config.toml`; el vínculo local y las credenciales no se versionan. Si el comando solicita la contraseña de la base, usá la guardada localmente durante la configuración. La app desplegada solo necesita las dos variables siguientes.
+
+Para configurar otra instancia desde cero:
+
+1. Creá un proyecto **Free** en [Supabase](https://supabase.com/dashboard). Elegí una región cercana a tu despliegue de Vercel.
+2. Aplicá [la migración inicial](supabase/migrations/202610200001_initial.sql) con la CLI, o ejecutala una sola vez desde SQL Editor si no vas a administrar migraciones con la CLI.
 3. Desde el proyecto obtené la URL y una clave **secret** para el servidor. Una clave legacy `service_role` también funciona. No uses la clave publicable/`anon` para esta app.
 4. Configurá:
 
@@ -57,6 +80,8 @@ No agregues `NEXT_PUBLIC_` a estas variables ni las subas a GitHub. Todas las co
 3. Cargá `SUPABASE_URL` y `SUPABASE_SECRET_KEY` en las variables del servidor para los entornos donde vayas a probar. Usá `pnpm build` como comando de compilación si el panel lo solicita.
 4. Desplegá y usá la dirección `*.vercel.app` incluida. No hace falta comprar un dominio. Los cambios en la rama principal generan nuevos despliegues.
 5. Comprobá una partida con un navegador anfitrión y otro incógnito: el primero anota; el segundo solo mira. Revisá que una ronda guardada aparezca sin recargar y que el enlace compartido abra el marcador.
+
+Para publicar desde la terminal en el proyecto ya vinculado, usá `pnpm exec vercel --prod`. El repositorio también está conectado a Vercel para desplegar los cambios de `main`. Las variables `SUPABASE_URL` y `SUPABASE_SECRET_KEY` están configuradas para producción y previews; la clave se guarda como Secret. `.vercelignore` excluye credenciales, artefactos y datos de prueba de las subidas por CLI.
 
 La creación y el guardado requieren peticiones JSON desde el mismo origen. Cada ronda usa un identificador único y la versión del marcador: la base bloquea la partida durante la transacción, evita duplicados y rechaza cargas de otra pestaña basadas en una ronda vieja.
 
