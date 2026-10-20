@@ -6,7 +6,10 @@ export const metadata: Metadata = {
   description:
     "Los puntos de tu grupo, en un solo lugar. Creá una partida, compartí el enlace y a jugar.",
   appleWebApp: { capable: true, title: "Puntito", statusBarStyle: "default" },
-  icons: { apple: "/icons/apple-touch-icon.png" },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icons/apple-touch-icon.png",
+  },
   robots: { index: false, follow: false },
 };
 export const viewport: Viewport = {
