@@ -5,10 +5,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
-  CheckCheck,
   Clipboard,
   Eye,
-  Flag,
   Link2,
   LoaderCircle,
   MessageCircle,
@@ -16,9 +14,10 @@ import {
   RefreshCw,
   Share2,
   Trophy,
-  X,
 } from "lucide-react";
-import { Brand, Footer } from "./brand";
+import { Brand } from "./brand";
+import { PagedRows } from "./paged-rows";
+import { AppDialog } from "./app-dialog";
 import {
   Draft,
   Game,
@@ -31,8 +30,10 @@ import {
   draftKey,
   errorMessage,
   hostKey,
+  lastGameKey,
   readGame,
   request,
+  randomId,
   RequestError,
 } from "@/lib/client";
 
@@ -72,6 +73,11 @@ export function GameScreen({ code }: { code: string }) {
         }
         const data = await readGame(code, token.current, controller.signal);
         if (!active) return;
+        try {
+          localStorage.setItem(lastGameKey, code);
+        } catch {
+          /* El marcador puede verse sin almacenamiento. */
+        }
         setGame(data.game);
         setCanEdit(data.canEdit);
         setInitialError("");
@@ -150,8 +156,18 @@ export function GameScreen({ code }: { code: string }) {
   useEffect(() => {
     if (!hasDraft) return;
     stepLock.current = false;
-    heading.current?.focus();
+    heading.current?.focus({ preventScroll: true });
   }, [draftStep, hasDraft]);
+
+  useEffect(() => {
+    if (!hasDraft) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasDraft]);
 
   function persist(next: Draft) {
     try {
@@ -172,7 +188,7 @@ export function GameScreen({ code }: { code: string }) {
     setNotice("");
     setConflict(false);
     persist({
-      id: crypto.randomUUID(),
+      id: randomId(),
       baseRound: game.roundCount,
       points: game.players.map(() => null),
       step: 0,
@@ -309,11 +325,14 @@ export function GameScreen({ code }: { code: string }) {
 
   if (!game)
     return (
-      <div className="site-shell">
-        <header className="site-header">
-          <Brand />
+      <div className="game-app">
+        <header className="app-header">
+          <Brand href={null} />
+          <Link className="button ghost" href="/app?menu=1">
+            Inicio
+          </Link>
         </header>
-        <main className="centered-state">
+        <main className="app-state" aria-live="polite">
           {initialError ? (
             <>
               <span className="big-symbol">?</span>
@@ -330,7 +349,7 @@ export function GameScreen({ code }: { code: string }) {
               >
                 Reintentar
               </button>
-              <Link href="/" className="text-link">
+              <Link href="/app?menu=1" className="text-link">
                 Volver al inicio
               </Link>
             </>
@@ -350,346 +369,286 @@ export function GameScreen({ code }: { code: string }) {
   const completed = draft && draft.step === game.players.length;
 
   return (
-    <div className="site-shell game-shell">
-      <header className="site-header">
-        <Brand />
-        <span className="role-pill">
-          {canEdit ? (
-            <>
-              <Flag size={14} /> Anfitrión
-            </>
-          ) : (
-            <>
-              <Eye size={15} /> Espectador
-            </>
-          )}
-        </span>
+    <div className="game-app">
+      <header className="app-header">
+        <Brand href={null} />
+        {draft && canEdit ? (
+          <span className="role-pill">Cargando ronda</span>
+        ) : (
+          <div className="app-header-actions">
+            <Link
+              href="/app?menu=1"
+              className="icon-button"
+              aria-label="Inicio de Puntito"
+            >
+              <ArrowLeft size={20} />
+            </Link>
+            <button
+              className="icon-button"
+              aria-label="Compartir partida"
+              onClick={() => {
+                setShareOpen(true);
+                setCopyDone(false);
+              }}
+            >
+              <Share2 size={20} />
+            </button>
+          </div>
+        )}
       </header>
-      <main className="game-main">
-        <div className="game-heading">
-          <div>
-            <span className="eyebrow">
-              <span className="small-line" /> LA MESA ESTÁ ARMADA
-            </span>
-            <h1>
-              Que siga el juego<span className="brand-dot">.</span>
-            </h1>
-            <p className="muted">
-              {game.players.length} jugadores{" "}
-              <span className="separator">/</span>{" "}
-              {game.roundCount === 0
-                ? "Todos arrancan en cero"
-                : `${game.roundCount} ${game.roundCount === 1 ? "ronda guardada" : "rondas guardadas"}`}
-            </p>
-          </div>
-          <button
-            className="button secondary share-trigger"
-            onClick={() => {
-              setShareOpen(!shareOpen);
-              setCopyDone(false);
-            }}
-            aria-expanded={shareOpen}
-          >
-            <Share2 size={17} /> Compartir partida
-          </button>
-        </div>
-
-        {shareOpen && (
-          <section className="share-panel card" aria-label="Compartir partida">
-            <div className="share-panel-header">
-              <div>
-                <h2>Pasalo al grupo.</h2>
-                <p className="muted">
-                  Con este enlace pueden mirar los puntos, sin editarlos.
-                </p>
-              </div>
-              <button
-                className="icon-button"
-                aria-label="Cerrar opciones de compartir"
-                onClick={() => setShareOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <label className="sr-only" htmlFor="share-link">
-              Enlace para espectadores
-            </label>
-            <input
-              id="share-link"
-              className="share-link-input"
-              readOnly
-              value={shareUrl}
-              onFocus={(e) => e.target.select()}
-            />
-            <div className="share-buttons">
-              <button className="button primary" onClick={copyLink}>
-                {copyDone ? <Check size={17} /> : <Clipboard size={17} />}
-                {copyDone ? "Copiado" : "Copiar enlace"}
-              </button>
-              <a
-                className="button secondary"
-                href={`https://wa.me/?text=${encodeURIComponent(`¡Así vienen los puntos! Mirá nuestra partida en Puntito: ${shareUrl}`)}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <MessageCircle size={17} /> WhatsApp
-              </a>
-              {typeof navigator !== "undefined" && !!navigator.share && (
-                <button className="button secondary" onClick={nativeShare}>
-                  <Share2 size={17} /> Más opciones
-                </button>
-              )}
-            </div>
-            <p className="share-code">
-              <Link2 size={13} /> Código: <strong>{code}</strong>
-            </p>
-          </section>
-        )}
-
-        {notice && (
-          <div className="notice" role="status">
-            <CheckCheck size={18} />
-            {notice}
-          </div>
-        )}
+      <main
+        className={`play-main ${draft && canEdit ? "is-loading-round" : "is-scoreboard"}`}
+      >
         {connectionError && (
-          <div className="connection-warning" role="status">
-            <RefreshCw size={16} />
-            <span>
-              {connectionError} Seguís viendo el último marcador disponible.
-            </span>
+          <div className="play-connection" role="status">
+            <RefreshCw size={15} />
+            <span>Sin conexión. Conservamos el último marcador.</span>
             <button className="text-link" onClick={() => void refresh()}>
               Reintentar
             </button>
           </div>
         )}
-
-        <div className={`game-grid ${draft ? "with-draft" : ""}`}>
+        {canEdit && draft ? (
           <section
-            className="card leaderboard"
-            aria-label="Tabla de posiciones"
+            className={`card round-panel ${completed ? "round-summary" : "round-entry"}`}
+            aria-label="Carga de ronda"
           >
-            <div className="leaderboard-top">
-              <div>
-                <span className="eyebrow">EL MARCADOR</span>
-                <h2>Tabla de posiciones</h2>
-              </div>
-              <span className={`live-tag ${connectionError ? "offline" : ""}`}>
-                <span className="status-dot" />
-                {connectionError ? "Sin conexión" : "En juego"}
+            <div className="round-kicker">
+              <span className="eyebrow">RONDA {draft.baseRound + 1}</span>
+              <span className="step-pill">
+                {completed
+                  ? "RESUMEN"
+                  : `${draft.step + 1} / ${game.players.length}`}
               </span>
             </div>
-            <div className="table-labels">
-              <span>POSICIÓN / JUGADOR</span>
-              <span>PUNTOS</span>
-            </div>
-            <ol className="standings">
-              {ranked.map((p, i) => (
-                <li
-                  className={i === 0 && p.total > 0 ? "leader" : ""}
+            <div className="progress-track" aria-hidden="true">
+              {game.players.map((p, i) => (
+                <span
                   key={p.id}
-                >
-                  <span className="rank">
-                    {i === 0 && p.total > 0 ? (
-                      <Trophy size={19} />
-                    ) : (
-                      String(i + 1).padStart(2, "0")
-                    )}
-                  </span>
-                  <span
-                    className={`avatar ${["coral", "lilac", "sand", "mint"][p.position % 4]}`}
-                  >
-                    {p.name.slice(0, 1).toLocaleUpperCase("es")}
-                  </span>
-                  <span className="standing-name">
-                    {p.name}
-                    {i === 0 && p.total > 0 && <small>EN LA PUNTA</small>}
-                  </span>
-                  <span className="total">
-                    {p.total}
-                    <small>pts</small>
-                  </span>
-                </li>
+                  className={
+                    draft.points[i] !== null && i < draft.step ? "filled" : ""
+                  }
+                />
               ))}
-            </ol>
-            <div className="leaderboard-footer">
-              <Eye size={15} />
-              <span>El marcador se actualiza cada 3 segundos.</span>
             </div>
-          </section>
-
-          <aside className="round-column">
-            {canEdit && draft ? (
-              <section className="card round-panel" aria-label="Carga de ronda">
-                <div className="round-kicker">
-                  <span className="eyebrow">RONDA {draft.baseRound + 1}</span>
-                  <span className="step-pill">
-                    {completed
-                      ? "RESUMEN"
-                      : `${draft.step + 1} / ${game.players.length}`}
-                  </span>
-                </div>
-                <div className="progress-track" aria-hidden="true">
-                  {game.players.map((p, i) => (
-                    <span
-                      key={p.id}
-                      className={
-                        draft.points[i] !== null && i < draft.step
-                          ? "filled"
-                          : ""
-                      }
-                    />
+            {current ? (
+              <>
+                <p className="round-question">¿Cuántos puntos sumó?</p>
+                <h2 className="current-player" ref={heading} tabIndex={-1}>
+                  {current.name}
+                </h2>
+                <p className="muted round-subtitle">
+                  Elegí un puntaje para seguir.
+                </p>
+                <div className="score-buttons">
+                  {POINTS.map((p) => (
+                    <button
+                      className={`score-button ${draft.points[draft.step] === p ? "selected" : ""}`}
+                      key={p}
+                      onClick={(event) => choose(p, event.timeStamp)}
+                      disabled={saving}
+                      aria-pressed={draft.points[draft.step] === p}
+                      aria-label={`${p} puntos para ${current.name}`}
+                    >
+                      <strong>{p}</strong>
+                      <span>puntos</span>
+                    </button>
                   ))}
                 </div>
-                {current ? (
-                  <>
-                    <p className="round-question">¿Cuántos puntos sumó?</p>
-                    <h2 className="current-player" ref={heading} tabIndex={-1}>
-                      {current.name}
-                    </h2>
-                    <p className="muted round-subtitle">
-                      Elegí un puntaje para seguir.
-                    </p>
-                    <div className="score-buttons">
-                      {POINTS.map((p) => (
-                        <button
-                          className={`score-button ${draft.points[draft.step] === p ? "selected" : ""}`}
-                          key={p}
-                          onClick={(event) => choose(p, event.timeStamp)}
-                          disabled={saving}
-                          aria-label={`${p} puntos para ${current.name}`}
-                        >
-                          <strong>{p}</strong>
-                          <span>puntos</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="round-nav">
-                      <button
-                        className="button ghost"
-                        onClick={back}
-                        disabled={draft.step === 0 || saving}
-                      >
-                        <ArrowLeft size={17} /> Atrás
-                      </button>
-                      <span className="muted">Avanza al elegir</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="summary-title" ref={heading} tabIndex={-1}>
-                      Una última mirada.
-                    </h2>
-                    <p className="muted">
-                      ¿Está todo bien? Guardemos la ronda.
-                    </p>
-                    <ol className="summary-list">
-                      {game.players.map((p, i) => (
-                        <li key={p.id}>
-                          <span className="player-number">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
-                          <span className="player-name">{p.name}</span>
-                          <strong>+{draft.points[i]}</strong>
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="summary-actions">
-                      <button
-                        className="button ghost"
-                        onClick={back}
-                        disabled={saving}
-                      >
-                        <ArrowLeft size={17} /> Atrás
-                      </button>
-                      <button
-                        className="button primary"
-                        onClick={saveRound}
-                        disabled={saving || conflict}
-                      >
-                        {saving ? (
-                          <LoaderCircle size={17} className="spin" />
-                        ) : (
-                          <Check size={18} />
-                        )}
-                        {saving ? "Guardando…" : "Guardar ronda"}
-                      </button>
-                    </div>
-                  </>
-                )}
-                {error && (
-                  <p className="error-message" role="alert">
-                    {error}
-                  </p>
-                )}
-                {conflict && (
+                <div className="round-nav">
                   <button
-                    className="text-link"
-                    onClick={() => void discardConflict()}
+                    className="button ghost"
+                    onClick={back}
+                    disabled={draft.step === 0 || saving}
                   >
-                    Descartar esta carga y actualizar
+                    <ArrowLeft size={17} /> Atrás
                   </button>
-                )}
-                <div className="draft-note">
-                  <span className="status-dot" />
-                  <span>
-                    {saving
-                      ? "Guardando los puntos de toda la mesa."
-                      : "Los puntos se suman al guardar la ronda."}
-                  </span>
+                  <span className="muted">Avanza al elegir</span>
                 </div>
-              </section>
+              </>
             ) : (
-              <section className="card ready-card">
-                <span className="ready-symbol" aria-hidden="true">
-                  ✳
-                </span>
-                <span className="eyebrow">
-                  {canEdit ? "CUANDO TERMINE LA MANO" : "TU LUGAR EN LA MESA"}
-                </span>
-                <h2>
-                  {canEdit
-                    ? "Vos anotás.\nPuntito suma."
-                    : "Los puntos,\na la vista."}
+              <>
+                <h2 className="summary-title" ref={heading} tabIndex={-1}>
+                  Una última mirada.
                 </h2>
-                <p>
-                  {canEdit
-                    ? "Cargá los puntos en el orden de la mesa. Nosotros nos encargamos de las cuentas."
-                    : "El anfitrión carga cada ronda y el marcador se actualiza acá. Vos concentrate en jugar."}
-                </p>
-                {canEdit ? (
-                  <>
-                    <button
-                      className="button primary full"
-                      onClick={startRound}
-                    >
-                      <Plus size={19} /> Cargar puntos
-                    </button>
-                    {error && (
-                      <p className="error-message" role="alert">
-                        {error}
-                      </p>
+                <p className="muted">¿Está todo bien? Guardemos la ronda.</p>
+                <PagedRows
+                  className="summary-list"
+                  label="Resumen de ronda"
+                  rows={game.players.map((p, i) => (
+                    <li key={p.id}>
+                      <span className="player-number">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="player-name">{p.name}</span>
+                      <strong>+{draft.points[i]}</strong>
+                    </li>
+                  ))}
+                />
+                <div className="summary-actions">
+                  <button
+                    className="button ghost"
+                    onClick={back}
+                    disabled={saving}
+                  >
+                    <ArrowLeft size={17} /> Atrás
+                  </button>
+                  <button
+                    className="button primary"
+                    onClick={saveRound}
+                    disabled={saving || conflict}
+                  >
+                    {saving ? (
+                      <LoaderCircle size={17} className="spin" />
+                    ) : (
+                      <Check size={18} />
                     )}
-                  </>
-                ) : (
-                  <span className="spectator-note">
-                    <Eye size={16} /> Estás viendo la partida
-                  </span>
-                )}
-              </section>
+                    {saving ? "Guardando…" : "Guardar ronda"}
+                  </button>
+                </div>
+              </>
             )}
-            <p className="table-note">
-              {canEdit
-                ? "Tu permiso de anfitrión queda guardado en este navegador. Compartí el enlace para que los demás miren."
-                : "¿Alguien pregunta cómo van? Compartile el enlace de esta partida."}
-            </p>
-          </aside>
-        </div>
-        <Link href="/" className="back-home">
-          <ArrowLeft size={15} /> Volver al inicio
-        </Link>
+            {error && (
+              <p className="error-message" role="alert">
+                {error}
+              </p>
+            )}
+            {conflict && (
+              <button
+                className="text-link"
+                onClick={() => void discardConflict()}
+              >
+                Descartar esta carga y actualizar
+              </button>
+            )}
+            <div className="draft-note">
+              <span className="status-dot" />
+              <span>
+                {saving
+                  ? "Guardando los puntos de toda la mesa."
+                  : "Los puntos se suman al guardar la ronda."}
+              </span>
+            </div>
+          </section>
+        ) : (
+          <>
+            <div className="play-heading">
+              <div>
+                <span className="eyebrow">LA CUENTA, CLARA</span>
+                <h1>
+                  El marcador<span className="brand-dot">.</span>
+                </h1>
+              </div>
+              <span className="round-badge">
+                Ronda <strong>{game.roundCount}</strong>
+              </span>
+            </div>
+            <section
+              className="card play-leaderboard"
+              aria-label="Tabla de posiciones"
+            >
+              <div className="table-labels">
+                <span>POSICIÓN / JUGADOR</span>
+                <span>PUNTOS</span>
+              </div>
+              <PagedRows
+                className="standings"
+                label="Tabla de posiciones"
+                rows={ranked.map((p, i) => (
+                  <li
+                    className={i === 0 && p.total > 0 ? "leader" : ""}
+                    key={p.id}
+                  >
+                    <span className="rank">
+                      {i === 0 && p.total > 0 ? (
+                        <Trophy size={18} />
+                      ) : (
+                        String(i + 1).padStart(2, "0")
+                      )}
+                    </span>
+                    <span
+                      className={`avatar ${["coral", "lilac", "sand", "mint"][p.position % 4]}`}
+                    >
+                      {p.name.slice(0, 1).toLocaleUpperCase("es")}
+                    </span>
+                    <span className="standing-name">{p.name}</span>
+                    <span className="total">
+                      {p.total}
+                      <small>pts</small>
+                    </span>
+                  </li>
+                ))}
+              />
+            </section>
+            {error && (
+              <p className="error-message" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="play-bottom">
+              {canEdit ? (
+                <button className="button primary full" onClick={startRound}>
+                  <Plus size={21} /> Cargar ronda {game.roundCount + 1}
+                </button>
+              ) : (
+                <span className="spectator-note">
+                  <Eye size={17} /> El anfitrión anota. Los puntos se actualizan
+                  solos.
+                </span>
+              )}
+              <p className="hint">
+                {canEdit
+                  ? "Vos anotás. Puntito suma."
+                  : "Estás viendo la partida"}
+              </p>
+            </div>
+          </>
+        )}
       </main>
-      <Footer />
+      {notice && (
+        <div className="play-toast" role="status">
+          {notice}
+        </div>
+      )}
+      {shareOpen && (
+        <AppDialog title="Pasalo al grupo." onClose={() => setShareOpen(false)}>
+          <p className="muted">
+            Con este enlace pueden mirar los puntos, sin editarlos.
+          </p>
+          <label className="sr-only" htmlFor="share-link">
+            Enlace para espectadores
+          </label>
+          <input
+            id="share-link"
+            className="share-link-input"
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.target.select()}
+          />
+          <div className="share-buttons">
+            <button className="button primary" onClick={copyLink}>
+              {copyDone ? <Check size={17} /> : <Clipboard size={17} />}
+              {copyDone ? "Copiado" : "Copiar enlace"}
+            </button>
+            <a
+              className="button secondary"
+              href={`https://wa.me/?text=${encodeURIComponent(`¡Así vienen los puntos! Mirá nuestra partida en Puntito: ${shareUrl}`)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle size={17} /> WhatsApp
+            </a>
+            {typeof navigator !== "undefined" && !!navigator.share && (
+              <button className="button secondary" onClick={nativeShare}>
+                <Share2 size={17} /> Más opciones
+              </button>
+            )}
+          </div>
+          <p className="share-code">
+            <Link2 size={13} /> Código: <strong>{code}</strong>
+          </p>
+        </AppDialog>
+      )}
     </div>
   );
 }

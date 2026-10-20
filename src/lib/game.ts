@@ -20,8 +20,8 @@ export function isPoints(value: unknown): value is Points {
 }
 
 export function validateNames(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length < 2 || value.length > 20) {
-    throw new Error("Agregá entre 2 y 20 jugadores.");
+  if (!Array.isArray(value) || value.length < 2 || value.length > 10) {
+    throw new Error("Agregá entre 2 y 10 jugadores.");
   }
   const names = value.map((name: unknown) => {
     if (typeof name !== "string") throw new Error("Revisá los nombres.");

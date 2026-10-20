@@ -6,7 +6,7 @@ Una app para llevar los puntos de la mesa: una persona anota, el resto mira el m
 
 ## Cómo se usa
 
-1. Creá una partida y agregá entre 2 y 20 nombres. Podés acomodarlos antes de empezar: ese orden se usa para cargar los puntos, aunque después cambien las posiciones.
+1. Creá una partida y agregá entre 2 y 10 nombres. Podés acomodarlos antes de empezar: ese orden se usa para cargar los puntos, aunque después cambien las posiciones.
 2. Compartí el enlace desde **Compartir partida**, por WhatsApp o con **Copiar enlace**. Quien lo recibe puede mirar, sin editar.
 3. Tocá **Cargar puntos**. Para cada jugador, elegí **0, 5, 6, 7 u 8**. La app avanza sola; **Atrás** permite corregir el valor anterior.
 4. Revisá el resumen y tocá **Guardar ronda**. Recién entonces se suman los puntos de todos. Un doble clic o reintento no los duplica.
@@ -14,6 +14,26 @@ Una app para llevar los puntos de la mesa: una persona anota, el resto mira el m
 La tabla va de mayor a menor; los empates conservan el orden inicial. Los espectadores consultan el marcador cada 3 segundos mientras la pestaña está visible y al volver a abrirla. Con mala conexión puede tardar más; la pantalla conserva el último marcador e informa el problema.
 
 El permiso del anfitrión y la carga pendiente quedan en su navegador. Si borrás sus datos o cambiás de navegador/dispositivo, no recuperás el permiso de edición. El enlace compartido no lo contiene. Cualquiera con ese enlace puede ver los nombres y los puntos: usá nombres o apodos adecuados para compartir con el grupo.
+
+## Instalar y usar en iPhone
+
+La presentación está en `/`. **Abrir Puntito** lleva a `/app`, donde podés crear una partida o entrar con un enlace. Al abrir `/app` de nuevo se retoma la última partida y, si había una ronda pendiente, la carga continúa en el mismo jugador. Desde el marcador, la flecha de inicio abre el menú para crear otra mesa.
+
+En Safari, usá **Compartir → Agregar a inicio** y, si aparece, mantené activado **Abrir como app**. El ícono abre `/app` en modo independiente. Instalá Puntito antes de crear la primera partida: Safari y la app instalada pueden usar almacenamiento separado, por lo que no se garantiza trasladar el permiso de anfitrión de una a la otra. No borres los datos de la app si querés conservar ese permiso.
+
+La experiencia de juego ocupa el alto disponible y respeta las áreas del notch y del indicador de inicio. La tabla desaparece al cargar puntos: se muestra un jugador por vez, seguido del resumen y la confirmación de guardado. Si los diez jugadores no entran con un tamaño legible, el marcador y el resumen usan páginas con botones. La lista de preparación puede desplazarse dentro de su panel; la pantalla de juego no tiene scroll general. El navegador conserva el control de algunos gestos del sistema. La confirmación al recargar se muestra sólo cuando el navegador la admite; la recuperación depende del borrador guardado, no de esa confirmación.
+
+La instalación no agrega juego sin conexión: crear y guardar requieren internet. El borrador queda en el dispositivo y el marcador abierto conserva la última lectura si se pierde la conexión. Esta versión no instala un service worker ni almacena respuestas privadas en caché.
+
+Antes de publicar, aplicá la migración `202610200002_ten_players.sql` con el procedimiento de Supabase documentado abajo. Limita las partidas nuevas a diez sin eliminar las existentes. En desarrollo local y en las pruebas, las migraciones se aplican automáticamente en orden.
+
+### Comprobación en un iPhone real
+
+- Instalar desde Safari y abrir desde el ícono: entra a la app sin las barras de Safari.
+- Crear una partida de diez jugadores, cargar una ronda y confirmar que la tabla sólo aparece antes y después de cargar.
+- Cerrar y volver a abrir a mitad de la carga: se conserva el jugador y los puntos ya elegidos.
+- Comprobar marcador, resumen, botones, notch e indicador de inicio con texto normal y ampliado; usar la paginación cuando haga falta.
+- Comprobar pérdida y recuperación de conexión, y que compartir sólo dé permiso de lectura.
 
 ## Desarrollo con pnpm
 
@@ -24,7 +44,9 @@ pnpm install --frozen-lockfile
 pnpm dev:local
 ```
 
-Abrí [http://127.0.0.1:3000](http://127.0.0.1:3000). Este comando usa **Postgres local con PGlite**, ejecuta la misma migración y levanta un adaptador de RPC accesible solo en loopback. Los datos de prueba quedan en `output/local-db`, ignorado por Git. Sirve para probar el flujo sin credenciales, no se usa en producción ni ofrece una dirección accesible para tus amigos.
+Abrí [http://127.0.0.1:3000](http://127.0.0.1:3000). Este comando usa **Postgres local con PGlite**, ejecuta la misma migración y levanta un adaptador de RPC accesible solo en loopback. Los datos de prueba quedan en `output/local-db`, ignorado por Git. Sirve para probar el flujo sin credenciales y no se usa en producción.
+
+Para probar desde un teléfono en la misma red sin recargas automáticas del modo de desarrollo, usá `pnpm preview:lan` en lugar de `pnpm dev:local`. Este comando compila y sirve la app con los datos locales. Si necesitás recarga automática mientras editás, usá `pnpm dev:lan`. La terminal muestra las direcciones IP disponibles en el puerto 3000. Sólo Next.js se expone a la red; el adaptador de la base queda en loopback. La interfaz y las partidas se pueden probar por HTTP; las funciones que exigen un contexto seguro, como compartir con el sistema o copiar automáticamente al portapapeles, pueden no estar disponibles. Para validar la instalación completa como PWA, usá el despliegue HTTPS.
 
 Para desarrollar contra un proyecto Supabase, copiá `.env.example` a `.env.local`, completá las dos variables y ejecutá `pnpm dev`.
 
@@ -62,7 +84,7 @@ La configuración del proyecto queda en `supabase/config.toml`; el vínculo loca
 Para configurar otra instancia desde cero:
 
 1. Creá un proyecto **Free** en [Supabase](https://supabase.com/dashboard). Elegí una región cercana a tu despliegue de Vercel.
-2. Aplicá [la migración inicial](supabase/migrations/202610200001_initial.sql) con la CLI, o ejecutala una sola vez desde SQL Editor si no vas a administrar migraciones con la CLI.
+2. Aplicá las migraciones con la CLI. Si usás SQL Editor, ejecutá una vez [la migración inicial](supabase/migrations/202610200001_initial.sql) y después [el límite de diez jugadores](supabase/migrations/202610200002_ten_players.sql), en ese orden.
 3. Desde el proyecto obtené la URL y una clave **secret** para el servidor. Una clave legacy `service_role` también funciona. No uses la clave publicable/`anon` para esta app.
 4. Configurá:
 

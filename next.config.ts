@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  allowedDevOrigins:
+    process.env.PUNTITO_DEV_ORIGINS?.split(",").filter(Boolean),
   poweredByHeader: false,
   async headers() {
     return [

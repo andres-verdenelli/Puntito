@@ -43,6 +43,12 @@ test("valida nombres y evita jugadores indistinguibles", () => {
   }
 });
 
+test("admite hasta diez jugadores y rechaza once", () => {
+  const names = Array.from({ length: 10 }, (_, i) => `Jugador ${i + 1}`);
+  assert.equal(validateNames(names).length, 10);
+  assert.throws(() => validateNames([...names, "Jugador 11"]), /2 y 10/);
+});
+
 test("recupera una ronda incluso en el resumen y descarta estados viejos o incompletos", () => {
   const draft = {
     id: "96061a47-9384-44e6-b50f-09a1f105fc41",
