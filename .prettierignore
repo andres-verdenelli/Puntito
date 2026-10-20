@@ -1,0 +1,6 @@
+node_modules
+.next
+output
+.playwright-cli
+pnpm-lock.yaml
+next-env.d.ts
