@@ -344,7 +344,7 @@ export function Home() {
                     );
                     return;
                   }
-                  router.push(`/p/${code}`);
+                  router.push(`/p/${code}?view=1`);
                 }}
               >
                 <label className="sr-only" htmlFor="join-code">
