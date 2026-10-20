@@ -180,3 +180,33 @@ test("anon y authenticated no pueden leer claves ni ejecutar RPC, service_role s
   assert.equal((await read()).game.roundCount, 2);
   await db.exec("reset role");
 });
+
+test("la base admite diez jugadores y rechaza once sin crear una partida parcial", async () => {
+  const names = Array.from({ length: 10 }, (_, i) => `Jugador ${i + 1}`);
+  const tenCode = "101010101010";
+  await db.query("select public.create_game($1,$2,$3,$4::text[])", [
+    randomUUID(),
+    tenCode,
+    hash,
+    names,
+  ]);
+  const { rows } = await db.query<{ data: GameResponse }>(
+    "select public.read_game($1,$2) as data",
+    [tenCode, hash],
+  );
+  assert.equal(rows[0].data.game.players.length, 10);
+  await assert.rejects(
+    db.query("select public.create_game($1,$2,$3,$4::text[])", [
+      randomUUID(),
+      "111111111111",
+      hash,
+      [...names, "Jugador 11"],
+    ]),
+    /INVALID_NAMES/,
+  );
+  const missing = await db.query<{ data: null }>(
+    "select public.read_game($1, null) as data",
+    ["111111111111"],
+  );
+  assert.equal(missing.rows[0].data, null);
+});

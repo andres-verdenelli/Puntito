@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "tsx scripts/local-dev.ts",
+    "dev:lan": "tsx scripts/local-dev.ts --lan",
+    "preview:lan": "pnpm build && tsx scripts/local-dev.ts --lan --production",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

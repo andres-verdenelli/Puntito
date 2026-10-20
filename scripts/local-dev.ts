@@ -2,7 +2,15 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
+import { networkInterfaces } from "node:os";
 import { testDatabase } from "../tests/support/database";
+
+const lan = process.argv.includes("--lan");
+const production = process.argv.includes("--production");
+const addresses = Object.values(networkInterfaces())
+  .flatMap((entries) => entries ?? [])
+  .filter((entry) => entry.family === "IPv4" && !entry.internal)
+  .map((entry) => entry.address);
 
 await mkdir("output", { recursive: true });
 const db = await testDatabase("output/local-db");
@@ -53,11 +61,18 @@ const server = createServer(async (req, res) => {
 await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
 const child = spawn(
   "pnpm",
-  ["exec", "next", "dev", "--hostname", "127.0.0.1"],
+  [
+    "exec",
+    "next",
+    production ? "start" : "dev",
+    "--hostname",
+    lan ? "0.0.0.0" : "127.0.0.1",
+  ],
   {
     stdio: "inherit",
     env: {
       ...process.env,
+      PUNTITO_DEV_ORIGINS: ["127.0.0.1", ...(lan ? addresses : [])].join(","),
       SUPABASE_URL: `http://127.0.0.1:${port}`,
       SUPABASE_SECRET_KEY: secret,
     },
@@ -66,6 +81,10 @@ const child = spawn(
 console.log(
   "Puntito local: los datos quedan en output/local-db. No se conectó a Supabase ni a Vercel.",
 );
+if (lan) {
+  for (const address of addresses)
+    console.log(`Acceso desde la misma red: http://${address}:3000/app`);
+}
 async function stop() {
   child.kill("SIGTERM");
   server.close();

@@ -5,7 +5,7 @@ Puntito uses Supabase for PostgreSQL and Vercel for the Next.js app. It does not
 ## Supabase setup
 
 1. Create a [Supabase project](https://supabase.com/dashboard) in a region near your app deployment. The repository configures Vercel functions in São Paulo (`gru1`) via [vercel.json](../vercel.json).
-2. Apply the [initial migration](../supabase/migrations/202610200001_initial.sql) using the CLI below, or run it once in the SQL Editor.
+2. Apply all migrations using the CLI below. If using the SQL Editor, run the [initial migration](../supabase/migrations/202610200001_initial.sql), then the [ten-player limit](../supabase/migrations/202610200002_ten_players.sql), once each and in that order.
 3. Copy the project URL and a server **secret** key. A legacy `service_role` key also works; a publishable or `anon` key does not.
 4. For local development against Supabase, copy [.env.example](../.env.example) to `.env.local` and set:
 
@@ -30,6 +30,8 @@ pnpm exec supabase db push
 ```
 
 Project configuration lives in [supabase/config.toml](../supabase/config.toml). Local project links and credentials are ignored by Git.
+
+Apply `202610200002_ten_players.sql` to existing databases before deploying this app version. It limits new games to ten players without deleting existing games. Local development and tests track and apply the migrations automatically.
 
 ## Vercel deployment
 

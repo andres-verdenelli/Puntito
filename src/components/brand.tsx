@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-export function Brand() {
-  return (
-    <Link className="brand" href="/" aria-label="Puntito, inicio">
+export function Brand({ href = "/" }: { href?: string | null }) {
+  const content = (
+    <>
       <span className="brand-mark" aria-hidden="true">
         <i />
         <i />
@@ -10,7 +10,14 @@ export function Brand() {
         <i />
       </span>
       Puntito<span className="brand-dot">.</span>
+    </>
+  );
+  return href ? (
+    <Link className="brand" href={href} aria-label="Puntito, inicio">
+      {content}
     </Link>
+  ) : (
+    <span className="brand">{content}</span>
   );
 }
 

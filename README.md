@@ -19,9 +19,11 @@
 
 ## 🎲 Made for game night
 
-- **No sign-up.** Add 2–20 players and start a game.
+- **No sign-up.** Add 2–10 players and start a game.
 - **One shared scoreboard.** The host records each round; friends open a view-only link. Scores refresh automatically.
 - **A round at a time.** Review everyone's points before saving. Retrying a save won't count the round twice.
+
+**Built for the table.** A fixed screen keeps the controls in reach, with one player at a time during score entry and a floating confirmation above each tap. Small screens use pages instead of scrolling the scoreboard.
 
 The app's interface is in Spanish.
 
@@ -35,6 +37,12 @@ Highest score comes first; ties keep the original player order.
 
 > The host's editing access stays in the browser where the game was created. Clearing browser data or switching devices loses that access. Anyone with the shared link can see player names and scores.
 
+## 📱 Use on iPhone
+
+The landing stays at `/`; **Abrir Puntito** opens `/app`. Add Puntito to your Home Screen from Safari to open the app directly and resume your latest game or pending round. Install it before creating your first game so editing access stays in the installed app.
+
+See the [iPhone guide](docs/iphone.md) for installation, connection requirements, and device checks.
+
 ## 🛠 Run locally
 
 Requires **Node.js 24** and **pnpm 10.30.3**.
@@ -44,7 +52,15 @@ pnpm install --frozen-lockfile
 pnpm dev:local
 ```
 
-Open [127.0.0.1:3000](http://127.0.0.1:3000). Local development uses **PGlite**, runs the database migration, and stores data in `output/local-db`. No account or credentials needed. The server is only accessible on your machine.
+Open [127.0.0.1:3000](http://127.0.0.1:3000). Local development uses **PGlite**, applies the database migrations in order, and stores data in `output/local-db`. No account or credentials needed. By default, the server is only accessible on your machine.
+
+To test on a phone connected to the same network:
+
+```sh
+pnpm preview:lan
+```
+
+The terminal prints the available IP addresses. This serves a compiled preview without development reloads; `pnpm dev:lan` enables live development instead. The database adapter stays on loopback. HTTP supports the scoring flow; use the HTTPS deployment to validate the full installation experience.
 
 Built with **Next.js · React · TypeScript · Supabase/PostgreSQL**.
 
