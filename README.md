@@ -74,4 +74,4 @@ pnpm test
 pnpm build
 ```
 
-Tests cover scoring, draft recovery, permissions, and database transactions using real SQL in PGlite.
+Tests cover scoring, draft recovery, permissions, database transactions using real SQL in PGlite, and simulated Supabase restoration/recovery. Optional [automatic resume](docs/auto-resume.md) restores a paused Free project when the app opens; it requires a server-only management token.

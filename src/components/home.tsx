@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Brand } from "./brand";
 import { parseGameCode, TOKEN, UUID, validateNames } from "@/lib/game";
+import { useRequestSignal } from "@/lib/use-request-signal";
 import {
   creationKey,
   errorMessage,
@@ -31,6 +32,7 @@ type Creation = { id: string; hostToken: string; names: string[] };
 
 export function Home() {
   const router = useRouter();
+  const requestSignal = useRequestSignal();
   const [screen, setScreen] = useState<"menu" | "setup" | "join">("menu");
   const [names, setNames] = useState<string[]>([]);
   const [name, setName] = useState("");
@@ -111,6 +113,7 @@ export function Home() {
 
   async function create() {
     if (locked.current) return;
+    const signal = requestSignal();
     locked.current = true;
     setBusy(true);
     setError("");
@@ -131,19 +134,21 @@ export function Home() {
       }
       setPending(payload);
       const { code } = await request<{ code: string }>("/api/games", {
+        signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      signal.throwIfAborted();
       localStorage.setItem(hostKey(code), payload.hostToken);
       localStorage.setItem(lastGameKey, code);
       localStorage.removeItem(creationKey);
       router.push(`/p/${code}`);
     } catch (e) {
-      setError(errorMessage(e));
+      if (!signal.aborted) setError(errorMessage(e));
     } finally {
       locked.current = false;
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   }
 

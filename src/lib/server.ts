@@ -3,11 +3,14 @@ import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { TOKEN } from "./game";
+import { createResumeCoordinator } from "./supabase-resume";
+import { DATABASE_WAKING } from "./database-status";
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -23,8 +26,37 @@ export function database() {
     );
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (url, options) =>
+        fetch(url, { ...options, signal: AbortSignal.timeout(8_000) }),
+    },
   });
 }
+
+const resumeCoordinator = createResumeCoordinator({
+  config: () => ({
+    url: process.env.SUPABASE_URL,
+    token: process.env.SUPABASE_SECRET_KEY
+      ? process.env.SUPABASE_MANAGEMENT_TOKEN
+      : undefined,
+  }),
+  probe: async () => {
+    try {
+      // Read-only, exercises the same RPC/credentials as the app. A missing
+      // game (null) is still a successful database read. Discard all data.
+      const { error } = await database().rpc("read_game", {
+        p_code: "000000000000",
+        p_host_hash: null,
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+});
+
+export const databaseAvailability = resumeCoordinator.check;
+export const resumeDatabase = resumeCoordinator.resume;
 
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -82,7 +114,10 @@ export function json(data: unknown, status = 200) {
   });
 }
 
-export function rpcError(error: { message: string; code?: string }): never {
+export async function rpcError(error: {
+  message: string;
+  code?: string;
+}): Promise<never> {
   if (error.message.includes("FORBIDDEN"))
     throw new ApiError(
       403,
@@ -100,6 +135,13 @@ export function rpcError(error: { message: string; code?: string }): never {
     );
   if (/INVALID_NAMES|INVALID_POINTS/.test(error.message))
     throw new ApiError(400, "Revisá los jugadores y los puntos de la ronda.");
+  const availability = await databaseAvailability(true);
+  if (availability.state !== "ready")
+    throw new ApiError(
+      503,
+      availability.message,
+      availability.state === "waking" ? DATABASE_WAKING : undefined,
+    );
   // No exponer detalles de infraestructura o consultas a los clientes.
   console.error("Supabase request failed", error.code ?? "unknown");
   throw new ApiError(
@@ -110,7 +152,10 @@ export function rpcError(error: { message: string; code?: string }): never {
 
 export function failure(error: unknown) {
   if (error instanceof ApiError)
-    return json({ error: error.message }, error.status);
+    return json(
+      { error: error.message, ...(error.code ? { code: error.code } : {}) },
+      error.status,
+    );
   console.error(
     "Unexpected API error",
     error instanceof Error ? error.name : "unknown",

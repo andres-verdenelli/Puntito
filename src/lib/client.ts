@@ -1,4 +1,6 @@
 import type { GameResponse } from "./game";
+import { DATABASE_WAKING } from "./database-status";
+import { databaseWaiter } from "./database-wait";
 
 export const hostKey = (code: string) => `puntito:host:${code}`;
 export const draftKey = (code: string) => `puntito:draft:${code}`;
@@ -17,14 +19,30 @@ export class RequestError extends Error {
 export async function request<T>(
   url: string,
   options: RequestInit = {},
+  afterWake = false,
 ): Promise<T> {
   try {
+    options.signal?.throwIfAborted();
     const response = await fetch(url, {
       ...options,
       cache: "no-store",
-      signal: options.signal ?? AbortSignal.timeout(12000),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(45_000)])
+        : AbortSignal.timeout(45_000),
     });
     const data = await response.json();
+    options.signal?.throwIfAborted();
+    if (
+      response.status === 503 &&
+      data.code === DATABASE_WAKING &&
+      !afterWake
+    ) {
+      await databaseWaiter.wait(options.signal ?? undefined);
+      options.signal?.throwIfAborted();
+      // Replay the identical serialized payload/host token, once. RPCs keep
+      // the existing creation/round IDs and provide transactional idempotency.
+      return request<T>(url, options, true);
+    }
     if (!response.ok)
       throw new RequestError(
         response.status,

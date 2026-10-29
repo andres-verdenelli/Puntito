@@ -24,6 +24,7 @@ import {
 import { Brand } from "./brand";
 import { PagedRows } from "./paged-rows";
 import { AppDialog } from "./app-dialog";
+import { useRequestSignal } from "@/lib/use-request-signal";
 import {
   Draft,
   Game,
@@ -50,6 +51,7 @@ export function GameScreen({
   code: string;
   viewOnly: boolean;
 }) {
+  const requestSignal = useRequestSignal(`${code}:${viewOnly}`);
   const [game, setGame] = useState<Game | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -138,9 +140,11 @@ export function GameScreen({
       document.visibilityState === "hidden"
     )
       return;
+    const signal = requestSignal();
     refreshing.current = true;
     try {
-      const data = await readGame(code, token.current);
+      const data = await readGame(code, token.current, signal);
+      signal.throwIfAborted();
       if (savingLock.current) return;
       setGame((previous) =>
         previous && previous.roundCount > data.game.roundCount
@@ -150,11 +154,11 @@ export function GameScreen({
       setCanEdit(data.canEdit);
       setConnectionError("");
     } catch (e) {
-      setConnectionError(errorMessage(e));
+      if (!signal.aborted) setConnectionError(errorMessage(e));
     } finally {
       refreshing.current = false;
     }
-  }, [code]);
+  }, [code, requestSignal]);
 
   useEffect(() => {
     if (!hasGame) return;
@@ -276,6 +280,7 @@ export function GameScreen({
       draft.points.some((p) => p === null)
     )
       return;
+    const signal = requestSignal();
     savingLock.current = true;
     setPointFeedback(null);
     setSaving(true);
@@ -283,6 +288,7 @@ export function GameScreen({
     setConflict(false);
     try {
       await request(`/api/games/${code}/rounds`, {
+        signal,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -294,6 +300,7 @@ export function GameScreen({
           points: draft.points,
         }),
       });
+      signal.throwIfAborted();
       // Una vez confirmado el guardado no volver a ofrecer esta ronda aunque falle la lectura siguiente.
       try {
         localStorage.removeItem(draftKey(code));
@@ -315,16 +322,19 @@ export function GameScreen({
       });
       setNotice(`Ronda ${draft.baseRound + 1} guardada. ¡Seguimos!`);
       try {
-        const data = await readGame(code, token.current);
+        const data = await readGame(code, token.current, signal);
+        signal.throwIfAborted();
         setGame(data.game);
         setCanEdit(data.canEdit);
         setConnectionError("");
       } catch {
-        setConnectionError(
-          "La ronda se guardó. Estamos intentando actualizar el marcador.",
-        );
+        if (!signal.aborted)
+          setConnectionError(
+            "La ronda se guardó. Estamos intentando actualizar el marcador.",
+          );
       }
     } catch (e) {
+      if (signal.aborted) return;
       setError(errorMessage(e));
       if (e instanceof RequestError && e.status === 409) setConflict(true);
       if (e instanceof RequestError && e.status === 403) setCanEdit(false);
