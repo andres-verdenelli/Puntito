@@ -23,13 +23,11 @@ export function createResumeCoordinator({
   fetcher?: typeof fetch;
   now?: () => number;
 }) {
-  let inflight: Promise<DatabaseStatus> | undefined;
-  let cached: { value: DatabaseStatus; until: number } | undefined;
   let restoreAfter = 0;
   let restoreResult = waking;
   let startingUntil = 0;
 
-  async function check(): Promise<DatabaseStatus> {
+  async function check(allowRestore: boolean): Promise<DatabaseStatus> {
     const { url, token } = config();
     // Opt-in, and never contact the Management API for the local adapter.
     if (
@@ -107,6 +105,11 @@ export function createResumeCoordinator({
       if (typeof status !== "string") return status;
       if (status !== "INACTIVE") return classify(status);
       if (now() < restoreAfter) return restoreResult;
+      if (!allowRestore)
+        return {
+          state: "waking",
+          message: "La base de datos está pausada. Vamos a reactivarla…",
+        };
 
       // Reserve before sending: an ambiguous timeout must not trigger a POST
       // on every poll. Status reads continue throughout the cooldown.
@@ -138,28 +141,36 @@ export function createResumeCoordinator({
     }
   }
 
-  return function availability(force = false): Promise<DatabaseStatus> {
-    if (inflight) return inflight;
-    if (
-      cached &&
-      cached.until > now() &&
-      !(force && cached.value.state === "ready")
-    )
-      return Promise.resolve(cached.value);
-    inflight = check()
-      .catch(() =>
-        unavailable("No pudimos conectar con la base de datos. Reintentá."),
+  function availability(allowRestore: boolean) {
+    // Observations cannot consume the cache/in-flight action of an authorized
+    // resume, nor can a cached INACTIVE observation suppress that action.
+    let inflight: Promise<DatabaseStatus> | undefined;
+    let cached: { value: DatabaseStatus; until: number } | undefined;
+    return function (force = false): Promise<DatabaseStatus> {
+      if (inflight) return inflight;
+      if (
+        cached &&
+        cached.until > now() &&
+        !(force && cached.value.state === "ready")
       )
-      .then((value) => {
-        cached = {
-          value,
-          until: now() + (value.state === "error" ? 30_000 : 5_000),
-        };
-        return value;
-      })
-      .finally(() => {
-        inflight = undefined;
-      });
-    return inflight;
-  };
+        return Promise.resolve(cached.value);
+      inflight = check(allowRestore)
+        .catch(() =>
+          unavailable("No pudimos conectar con la base de datos. Reintentá."),
+        )
+        .then((value) => {
+          cached = {
+            value,
+            until: now() + (value.state === "error" ? 30_000 : 5_000),
+          };
+          return value;
+        })
+        .finally(() => {
+          inflight = undefined;
+        });
+      return inflight;
+    };
+  }
+
+  return { check: availability(false), resume: availability(true) };
 }

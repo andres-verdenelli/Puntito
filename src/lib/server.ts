@@ -33,7 +33,7 @@ export function database() {
   });
 }
 
-export const databaseAvailability = createResumeCoordinator({
+const resumeCoordinator = createResumeCoordinator({
   config: () => ({
     url: process.env.SUPABASE_URL,
     token: process.env.SUPABASE_SECRET_KEY
@@ -54,6 +54,9 @@ export const databaseAvailability = createResumeCoordinator({
     }
   },
 });
+
+export const databaseAvailability = resumeCoordinator.check;
+export const resumeDatabase = resumeCoordinator.resume;
 
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");

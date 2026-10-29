@@ -16,7 +16,7 @@ function fixture() {
     token: "test-management-secret",
   };
   let probes = 0;
-  const availability = createResumeCoordinator({
+  const coordinator = createResumeCoordinator({
     config: () => config,
     now: () => time,
     probe: async () => {
@@ -51,7 +51,8 @@ function fixture() {
     },
   });
   return {
-    availability,
+    availability: coordinator.resume,
+    check: coordinator.check,
     config,
     calls,
     advance(ms = 31_000) {
@@ -110,6 +111,26 @@ test("base activa: no depende de Management API y un juego inexistente no implic
   assert.equal(f.probes(), 1);
   await f.availability(true);
   assert.equal(f.probes(), 2); // RPC failure invalidates ready cache
+});
+
+test("consultar INACTIVE no restaura ni consume el cooldown o el intento autorizado", async () => {
+  const f = fixture();
+  await Promise.all(Array.from({ length: 20 }, () => f.check()));
+  assert.deepEqual(f.calls, ["GET"]);
+  // A read-only cached result must not suppress the actual resume request.
+  await Promise.all(Array.from({ length: 20 }, () => f.availability()));
+  assert.deepEqual(f.calls, ["GET", "GET", "POST"]);
+  f.advance();
+  await f.check();
+  assert.equal(f.calls.filter((method) => method === "POST").length, 1);
+
+  // An in-flight read and an authorized resume must not share a read-only result.
+  const concurrent = fixture();
+  await Promise.all([concurrent.check(), concurrent.availability()]);
+  assert.equal(
+    concurrent.calls.filter((method) => method === "POST").length,
+    1,
+  );
 });
 
 test("sin token y PGlite: conserva la conexión anterior sin llamadas administrativas", async () => {

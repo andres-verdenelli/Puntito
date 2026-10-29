@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { body, databaseAvailability, failure, json } from "@/lib/server";
+import { body, failure, json, resumeDatabase } from "@/lib/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -9,7 +9,7 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   try {
     await body(request);
-    const status = await databaseAvailability();
+    const status = await resumeDatabase();
     return json(
       status,
       status.state === "error" ? 503 : status.state === "waking" ? 202 : 200,
