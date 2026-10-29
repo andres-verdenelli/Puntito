@@ -115,3 +115,25 @@ test("señal de cancelación se combina con el timeout individual de cada lectur
     { name: "AbortError" },
   );
 });
+
+test("una respuesta tardía no se acepta después de cancelar la pantalla", async (t) => {
+  const controller = new AbortController();
+  let release!: (response: Response) => void;
+  const mock = t.mock.method(
+    globalThis,
+    "fetch",
+    () =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const pending = request("/api/games", {
+    method: "POST",
+    body: "{}",
+    signal: controller.signal,
+  });
+  controller.abort();
+  release(Response.json({ code: "abcdef123456" }));
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(mock.mock.calls.length, 1);
+});

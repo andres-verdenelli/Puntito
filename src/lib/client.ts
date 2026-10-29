@@ -22,6 +22,7 @@ export async function request<T>(
   afterWake = false,
 ): Promise<T> {
   try {
+    options.signal?.throwIfAborted();
     const response = await fetch(url, {
       ...options,
       cache: "no-store",
@@ -30,12 +31,14 @@ export async function request<T>(
         : AbortSignal.timeout(45_000),
     });
     const data = await response.json();
+    options.signal?.throwIfAborted();
     if (
       response.status === 503 &&
       data.code === DATABASE_WAKING &&
       !afterWake
     ) {
       await databaseWaiter.wait(options.signal ?? undefined);
+      options.signal?.throwIfAborted();
       // Replay the identical serialized payload/host token, once. RPCs keep
       // the existing creation/round IDs and provide transactional idempotency.
       return request<T>(url, options, true);
