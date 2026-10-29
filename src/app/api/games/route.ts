@@ -12,6 +12,7 @@ import {
 } from "@/lib/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   try {
     const input = await body(request);
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
         p_names: names,
       });
       if (!error) return json({ code: data }, 201);
-      if (error.code !== "23505") rpcError(error);
+      if (error.code !== "23505") await rpcError(error);
     }
     throw new ApiError(503, "No pudimos crear la partida. Intentá otra vez.");
   } catch (error) {

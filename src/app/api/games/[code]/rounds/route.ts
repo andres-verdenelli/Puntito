@@ -11,6 +11,7 @@ import {
 } from "@/lib/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ code: string }> },
@@ -45,7 +46,7 @@ export async function POST(
       p_base_round: input.baseRound,
       p_points: input.points,
     });
-    if (error) rpcError(error);
+    if (error) await rpcError(error);
     return json({ saved: true });
   } catch (error) {
     return failure(error);

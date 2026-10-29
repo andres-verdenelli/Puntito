@@ -18,6 +18,10 @@ Run `pnpm dev` to use this database instead of the local PGlite adapter.
 
 Keep both variables on the server. Never add a `NEXT_PUBLIC_` prefix or commit credentials.
 
+### Optional automatic resume on Free
+
+To restore a paused Supabase project when someone opens the app, add the server-only `SUPABASE_MANAGEMENT_TOKEN`. It must be a separate scoped personal access token restricted to the Puntito project with **Project Settings: Read-write**. See [automatic resume](auto-resume.md) for Vercel setup, waiting/retry limits, concurrency limitations and the pending real-world check. Without this variable, the app retains its existing behavior.
+
 ### Database migrations
 
 The Supabase and Vercel CLIs are pinned in `devDependencies`. After installing dependencies:

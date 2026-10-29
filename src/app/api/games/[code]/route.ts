@@ -10,6 +10,7 @@ import {
 } from "@/lib/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ code: string }> },
@@ -25,7 +26,7 @@ export async function GET(
       p_code: code,
       p_host_hash: hostHash(request),
     });
-    if (error) rpcError(error);
+    if (error) await rpcError(error);
     if (!data)
       throw new ApiError(
         404,
